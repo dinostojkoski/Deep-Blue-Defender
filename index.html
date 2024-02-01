@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Deep Blue Defender</title>
+  <link href="https://fonts.cdnfonts.com/css/public-pixel" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+    }
+
+    canvas {
+      background: url("img/background.gif") no-repeat center center;
+      background-size: 100%;
+      border: none;
+      display: block;
+      margin: 20px auto;
+    }
+
+    #gameOverMessage {
+      font-family: "Public Pixel", sans-serif;
+      display: none;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 80px;
+      color: darkred;
+      font-weight: bold;
+    }
+
+    .pre-game-facts,
+    .start-window {
+      display: none;
+      position: absolute;
+      margin: auto;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 999;
+      font-size: 22px;
+      color: #fff;
+      text-align: center;
+    }
+
+    .start-window {
+      font-family: "Public Pixel", sans-serif;
+    }
+
+    .pre-game-facts {
+      font-family: "Arial Black", sans-serif;
+    }
+
+    #factText {
+      margin: auto 200px auto 200px;
+      font-size: 50px;
+    }
+
+    #startContainer {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      margin: auto;
+      height: 100%;
+    }
+
+    #startButton {
+      font-family: "Public Pixel", sans-serif;
+      background: transparent;
+      color: white;
+      display: block;
+      width: 150px;
+      height: 60px;
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 18px;
+      cursor: pointer;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 36px;
+    }
+  </style>
+</head>
+
+<body>
+
+<div id="startWindow" class="start-window">
+  <div id="startContainer">
+    <h1>Welcome to Deep Blue Defender </h1>
+    <button id="startButton" onclick="Game()">Start Game</button>
+  </div>
+</div>
+
+<div id="preGameFacts" class="pre-game-facts">
+  <p id="factText">Loading facts...</p>
+</div>
+
+<canvas id="gameCanvas" width="1200" height="660"></canvas>
+<div id="gameOverMessage">GAME OVER</div>
+
+<script>
+  function Game() {
+    const startWindow = document.getElementById('startWindow');
+    const preGameFacts = document.getElementById('preGameFacts');
+
+    // Hide the start window and display pre-game facts
+    startWindow.style.display = 'none';
+    preGameFacts.style.display = 'flex';
+
+    // Display pre-game facts and start the game loop after a delay
+    setTimeout(() => {
+      preGameFacts.style.display = 'none';
+
+      const canvas = document.getElementById('gameCanvas');
+      const ctx = canvas.getContext('2d');
+
+      const heartImage = new Image();
+      heartImage.src = 'img/heart.png';
+
+      let playerImageRight = new Image();
+      playerImageRight.src = 'img/player-right.png';
+
+      let playerImageLeft = new Image();
+      playerImageLeft.src = 'img/player-left.png';
+
+      const trashImages = [
+        'img/trash.png',
+        'img/straw-drink.png',
+        'img/plastic-bottle.png',
+        'img/plastic-trash-bag.png'
+      ];
+
+      const mineImages = [
+        'img/mine-big.png'
+      ];
+
+      // Wait for all images to load before starting the game
+      let imagesLoaded = 0;
+
+      function checkAllImagesLoaded() {
+        imagesLoaded++;
+        if (imagesLoaded === trashImages.length + mineImages.length + 3) {
+          startGame();
+        }
+      }
+
+      heartImage.onload = function () {
+        checkAllImagesLoaded();
+      };
+
+      playerImageRight.onload = function () {
+        checkAllImagesLoaded();
+      };
+
+      playerImageLeft.onload = function () {
+        checkAllImagesLoaded();
+      };
+
+      trashImages.forEach(function (trashImageSrc) {
+        const trashImage = new Image();
+        trashImage.src = trashImageSrc;
+        trashImage.onload = function () {
+          checkAllImagesLoaded();
+        };
+      });
+
+      mineImages.forEach(function (mineImageSrc) {
+        const mineImage = new Image();
+        mineImage.src = mineImageSrc;
+        mineImage.onload = function () {
+          checkAllImagesLoaded();
+        };
+      });
+
+      function startGame() {
+        let oceanImage = canvas;
+
+        let player = {
+          x: 50,
+          y: canvas.height - 110,
+          width: 110,
+          height: 110,
+          speed: 10,
+          direction: 'right' // Initial direction
+        };
+
+        let trash = {
+          x: 0,
+          y: 0,
+          width: 80,
+          height: 80,
+          speed: 0.3,
+          // Property to store the current trash image
+          currentImage: null
+        };
+
+        let mines = [];
+
+        let score = 0;
+        let level = 1;
+        let hearts = 3; // Initial number of hearts
+        /*let speedIncreaseInterval = 5000; // Increase speed every 5 seconds
+        let speedIncreaseFactor = 0.1; // Speed increase factor*/
+
+        function drawOcean() {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(oceanImage, 0, 0, canvas.width, canvas.height);
+        }
+
+        function drawPlayer() {
+          const playerImg = player.direction === 'right' ? playerImageRight : playerImageLeft;
+          ctx.drawImage(playerImg, player.x, player.y, player.width, player.height);
+        }
+
+        function drawTrash() {
+          ctx.drawImage(trash.currentImage, trash.x, trash.y, trash.width, trash.height);
+        }
+
+        function movePlayer(event) {
+          if (event.key === 'ArrowRight' && player.x + player.width < canvas.width) {
+            player.x += player.speed;
+            player.direction = 'right';
+          } else if (event.key === 'ArrowLeft' && player.x > 0) {
+            player.x -= player.speed;
+            player.direction = 'left';
+          }
+        }
+
+        function generateTrash() {
+          trash.x = Math.random() * (canvas.width - trash.width);
+          trash.y = 0;
+
+          // Randomly select a trash image from the list
+          trash.currentImage = new Image();
+          trash.currentImage.src = trashImages[Math.floor(Math.random() * trashImages.length)];
+        }
+
+        function generateMines() {
+          let newMine = {
+            x: Math.random() * (canvas.width - trash.width),
+            y: 0,
+            width: 80,
+            height: 80,
+            speed: 0.3,
+            currentImage: new Image(),
+          };
+          newMine.currentImage.src = mineImages[Math.floor(Math.random() * mineImages.length)];
+          mines.push(newMine);
+        }
+
+        function drawMines() {
+          mines.forEach((mine) => {
+            ctx.drawImage(mine.currentImage, mine.x, mine.y, mine.width, mine.height);
+          });
+        }
+
+        function collisionDetection() {
+          if (
+                  player.x < trash.x + trash.width &&
+                  player.x + player.width > trash.x &&
+                  player.y < trash.y + trash.height &&
+                  player.y + player.height > trash.y
+          ) {
+            score += 50;
+            updateSpeeds();
+            generateTrash();
+          } else {
+
+          }
+          for (let i = 0; i < mines.length; i++) {
+            if (
+                    player.x < mines[i].x + mines[i].width &&
+                    player.x + player.width > mines[i].x &&
+                    player.y < mines[i].y + mines[i].height &&
+                    player.y + player.height > mines[i].y
+            ) {
+              hearts--;
+              mines.splice(i, 1); // Remove the mine from the array
+            }
+          }
+        }
+
+        function gameOver() {
+          // Game over logic, you can customize this part
+          showGameOverMessage();
+
+          alert('Game Over! Your final score is: ' + score);
+          // Additional logic to reset the game or navigate to a game-over screen
+          let pressed = confirm("Start Again?");
+          if (pressed === true) {
+            resetGame();
+            hideGameOverMessage();
+          }
+        }
+
+        function drawHearts() {
+          const heartSize = 40; // Adjust the size as needed
+          const margin = 5;
+          const startX = canvas.width - (heartSize + margin) * 3; // Adjust the starting position as needed
+
+          for (let i = 0; i < hearts; i++) {
+            ctx.drawImage(heartImage, startX + i * (heartSize + margin), 10, heartSize, heartSize);
+          }
+        }
+
+        const scoreIncrement = 500;
+        let baseTrashSpeed = 0.5; // Initial trash speed
+        let basePlayerSpeeds = 12;
+
+        function updateSpeeds() {
+          // Calculate the trash speed based on the score
+          trash.speed = baseTrashSpeed + Math.floor(score / scoreIncrement) * 0.1;
+
+          player.speed = basePlayerSpeeds + Math.floor(score / scoreIncrement) * 0.5;
+
+          // Update the level based on the calculated speed
+          level = Math.floor(score / scoreIncrement) + 1;
+        }
+
+        function showGameOverMessage() {
+          const gameOverMessage = document.getElementById('gameOverMessage');
+          gameOverMessage.style.display = 'block';
+        }
+
+        function hideGameOverMessage() {
+          const gameOverMessage = document.getElementById('gameOverMessage');
+          gameOverMessage.style.display = 'none';
+        }
+
+        function resetGame() {
+          score = 0;
+          level = 1;
+          hearts = 3;
+          baseTrashSpeed = 0.5;
+          basePlayerSpeeds = 10;
+          trash.speed = baseTrashSpeed;
+          player.speed = basePlayerSpeeds;
+          generateTrash();
+          generateInitialMines();
+        }
+
+        function update() {
+          drawOcean();
+          drawPlayer();
+          drawTrash();
+          drawHearts();
+          drawMines();
+          collisionDetection();
+
+          if (hearts === 0) {
+            gameOver();
+          }
+
+          // Move the trash down
+          trash.y += trash.speed;
+
+          // Move mines down and remove them if they reach the bottom
+          for (let i = mines.length - 1; i >= 0; i--) {
+            const mine = mines[i];
+            mine.y += mine.speed;
+
+            // Check if mine reached the bottom
+            if (mine.y > canvas.height) {
+              // Remove the mine if it reached the bottom without colliding with the player
+              mines.splice(i, 1);
+              generateMines();
+            }
+          }
+
+          // Check if trash reached the bottom
+          if (trash.y > canvas.height) {
+            // Generate new trash if it reached the bottom without being caught
+            generateTrash();
+            generateTrash();
+            generateTrash();
+            // -50 points if the player doesn't catch the trash
+            score -= 50;
+          }
+
+          // Display the score
+          ctx.fillStyle = '#fff';
+          ctx.font = '24px Arial Black';
+          ctx.fillText('Score: ' + score, 10, 30);
+          ctx.fillText('Level: ' + level, 10, 60);
+
+          // Continue the game loop
+          requestAnimationFrame(update);
+        }
+
+        function generateInitialMines() {
+          for (let i = 0; i < 3; i++) {
+            generateMines();
+          }
+        }
+
+        // Generate initial trash
+        generateTrash();
+
+        // Generate initial trash
+        generateInitialMines();
+
+        // Set up event listener for player movement
+        window.addEventListener('keydown', movePlayer);
+
+        // Set up interval to increase score every second
+        setInterval(() => {
+          score++;
+        }, 100);
+
+        // Start the game loop
+        update();
+      }
+    }, 5000);
+  }
+
+  function displayPreGameFacts() {
+
+    const factText = document.getElementById('factText');
+
+    // Array of pre-game facts about ocean pollution
+    const facts = [
+      "Дали знаевте дека над 8 милиони тони пластика се исфрлаат во океаните секоја година?",
+      "Пластиката има долго време на декомпозиција, што придонесува до проблем со микропластика.",
+      "До 2050 година, во океанот би можело да има повеќе пластика отколку риби. Ајде да направиме промена!",
+      "Микропластиката се пробива во океаните, а со тоа и во синџирот на исхрана!",
+      "Многу животни, грешат пластичен отпад за храна што може да доведе до внатрешни повреди и смрт.",
+      "Големата тихоокеанска дамка со ѓубре е место на Тихи океан со големи количини пластичен отпад.",
+
+    ];
+
+    // Display a random fact
+    factText.innerText = facts[Math.floor(Math.random() * facts.length)];
+
+    // Note: Do not hide the preGameFacts div here, as we want to keep the start window visible
+
+    // Initialize the game setup here (optional)
+    // const canvas = document.getElementById('gameCanvas');
+    // const ctx = canvas.getContext('2d');
+  }
+
+  window.onload = function () {
+    // Display the start window initially
+    const startWindow = document.getElementById('startWindow');
+    startWindow.style.display = 'flex';
+
+    // Call the function to display pre-game facts before starting the game
+    displayPreGameFacts();
+  };
+
+</script>
+</body>
+
+</html>
